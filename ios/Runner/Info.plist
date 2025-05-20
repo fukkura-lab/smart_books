@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Smart Books</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>smart_books</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+
+	<!-- アプリの権限設定 -->
+	<!-- カメラへのアクセス -->
+	<key>NSCameraUsageDescription</key>
+	<string>領収書や請求書の写真撮影に必要です。</string>
+	
+	<!-- 写真ライブラリへのアクセス -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>領収書や請求書の画像をアップロードするために必要です。</string>
+	
+	<!-- マイクへのアクセス -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>音声入力に必要です。</string>
+	
+	<!-- ローカル通知の許可 -->
+	<key>NSUserNotificationAlertStyle</key>
+	<string>alert</string>
+	
+	<!-- 位置情報へのアクセス（必要な場合） -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>経費の位置情報を記録するために必要です。</string>
+	
+	<!-- Face IDへのアクセス（必要な場合） -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>安全なログインのために顔認証を使用します。</string>
+	
+	<!-- ファイルシステムへのアクセス -->
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	
+	<!-- ダークモードサポート -->
+	<key>UIUserInterfaceStyle</key>
+	<string>Light</string>
+	
+	<!-- iOS 9.0以降がサポート対象の場合 -->
+	<key>MinimumOSVersion</key>
+	<string>12.0</string>
+	
+	<!-- アプリがバックグラウンドで実行できるモード -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
+
+	<key>NSMicrophoneUsageDescription</key>
+	<string>音声入力機能を使用するためにマイクへのアクセスが必要です</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>音声認識機能を使用して会話を文字に変換します</string>
+</dict>
+</plist>

@@ -1,0 +1,401 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:smart_books/data/models/chat_message.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:path/path.dart' as path;
+
+class ChatBubble extends StatelessWidget {
+  final ChatMessage message;
+  final VoidCallback? onImageTap;
+  
+  const ChatBubble({
+    Key? key,
+    required this.message,
+    this.onImageTap,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    // システムメッセージの場合は中央に表示
+    if (message.sender == MessageSender.system) {
+      return _buildSystemMessage(context);
+    }
+    
+    // ユーザーメッセージかAIメッセージかで位置を変える
+    final isUser = message.sender == MessageSender.user;
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // AIアイコン（AIメッセージの場合のみ表示）
+          if (!isUser) _buildAvatar(context),
+          
+          // メッセージバブル
+          Flexible(
+            child: Container(
+              margin: EdgeInsets.only(
+                left: isUser ? 64.0 : 8.0,
+                right: isUser ? 8.0 : 64.0,
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 10.0,
+              ),
+              decoration: BoxDecoration(
+                color: isUser
+                    ? Theme.of(context).primaryColor
+                    : Theme.of(context).cardColor,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(16.0),
+                  topRight: const Radius.circular(16.0),
+                  bottomLeft: Radius.circular(isUser ? 16.0 : 4.0),
+                  bottomRight: Radius.circular(isUser ? 4.0 : 16.0),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 5,
+                    spreadRadius: 1,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // メッセージの種類に応じたコンテンツを表示
+                  _buildMessageContent(context),
+                  
+                  // タイムスタンプ
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (message.status == MessageStatus.failed)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 4.0),
+                          child: Icon(
+                            Icons.error_outline,
+                            size: 12.0,
+                            color: isUser
+                                ? Colors.white.withOpacity(0.7)
+                                : Colors.red,
+                          ),
+                        ),
+                      Text(
+                        _formatTime(message.timestamp),
+                        style: TextStyle(
+                          fontSize: 10.0,
+                          color: isUser
+                              ? Colors.white.withOpacity(0.7)
+                              : Colors.black54,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // アバターウィジェットを構築
+  Widget _buildAvatar(BuildContext context) {
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        color: Theme.of(context).primaryColor.withOpacity(0.1),
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Icon(
+          Icons.smart_toy_outlined,
+          size: 18,
+          color: Theme.of(context).primaryColor,
+        ),
+      ),
+    );
+  }
+  
+  // システムメッセージを構築
+  Widget _buildSystemMessage(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(
+        vertical: 16.0,
+        horizontal: 32.0,
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16.0,
+        vertical: 8.0,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.amber.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12.0),
+        border: Border.all(
+          color: Colors.amber.withOpacity(0.3),
+          width: 1.0,
+        ),
+      ),
+      child: Text(
+        message.content,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 12.0,
+          color: Colors.amber[800],
+        ),
+      ),
+    );
+  }
+  
+  // メッセージの内容に応じたウィジェットを構築
+  Widget _buildMessageContent(BuildContext context) {
+    final isUser = message.sender == MessageSender.user;
+    
+    switch (message.type) {
+      case MessageType.image:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (message.content.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Text(
+                  message.content,
+                  style: TextStyle(
+                    color: isUser ? Colors.white : Colors.black87,
+                  ),
+                ),
+              ),
+            GestureDetector(
+              onTap: onImageTap,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8.0),
+                child: Image.file(
+                  File(message.imageUrl!),
+                  width: 200,
+                  height: 200,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      width: 200,
+                      height: 200,
+                      color: Colors.grey[300],
+                      child: const Center(
+                        child: Icon(
+                          Icons.broken_image,
+                          color: Colors.white,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        );
+      
+      case MessageType.document:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (message.content.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Text(
+                  message.content,
+                  style: TextStyle(
+                    color: isUser ? Colors.white : Colors.black87,
+                  ),
+                ),
+              ),
+            GestureDetector(
+              onTap: () => _openFile(message.documentUrl!),
+              child: Container(
+                padding: const EdgeInsets.all(8.0),
+                decoration: BoxDecoration(
+                  color: isUser
+                      ? Colors.white.withOpacity(0.1)
+                      : Colors.grey.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _getFileIcon(message.documentUrl!),
+                      color: isUser ? Colors.white : Colors.grey[700],
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8.0),
+                    Flexible(
+                      child: Text(
+                        _getFileName(message.documentUrl!),
+                        style: TextStyle(
+                          color: isUser ? Colors.white : Colors.black87,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      
+      case MessageType.audio:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              message.content,
+              style: TextStyle(
+                color: isUser ? Colors.white : Colors.black87,
+              ),
+            ),
+          ],
+        );
+      
+      case MessageType.system:
+        return Text(
+          message.content,
+          style: TextStyle(
+            color: isUser ? Colors.white : Colors.black87,
+            fontStyle: FontStyle.italic,
+          ),
+        );
+      
+      case MessageType.text:
+      default:
+        return _buildTextMessage(context);
+    }
+  }
+  
+  // テキストメッセージのウィジェットを構築
+  Widget _buildTextMessage(BuildContext context) {
+    final isUser = message.sender == MessageSender.user;
+    
+    // リンクがある場合は対応
+    final urlPattern = RegExp(
+      r'https?://[^\s]+',
+      caseSensitive: false,
+    );
+    
+    if (urlPattern.hasMatch(message.content)) {
+      final matches = urlPattern.allMatches(message.content);
+      final spans = <InlineSpan>[];
+      
+      int lastEnd = 0;
+      for (final match in matches) {
+        // 前のテキスト
+        if (match.start > lastEnd) {
+          spans.add(
+            TextSpan(
+              text: message.content.substring(lastEnd, match.start),
+              style: TextStyle(
+                color: isUser ? Colors.white : Colors.black87,
+              ),
+            ),
+          );
+        }
+        
+        // リンク
+        spans.add(
+          TextSpan(
+            text: message.content.substring(match.start, match.end),
+            style: TextStyle(
+              color: isUser ? Colors.white : Colors.blue,
+              decoration: TextDecoration.underline,
+              fontWeight: FontWeight.bold,
+            ),
+            recognizer: TapGestureRecognizer()
+              ..onTap = () {
+                final url = message.content.substring(match.start, match.end);
+                _launchUrl(url);
+              },
+          ),
+        );
+        
+        lastEnd = match.end;
+      }
+      
+      // 残りのテキスト
+      if (lastEnd < message.content.length) {
+        spans.add(
+          TextSpan(
+            text: message.content.substring(lastEnd),
+            style: TextStyle(
+              color: isUser ? Colors.white : Colors.black87,
+            ),
+          ),
+        );
+      }
+      
+      return SelectableText.rich(
+        TextSpan(children: spans),
+      );
+    } else {
+      return SelectableText(
+        message.content,
+        style: TextStyle(
+          color: isUser ? Colors.white : Colors.black87,
+        ),
+      );
+    }
+  }
+  
+  // 時間のフォーマット
+  String _formatTime(DateTime dateTime) {
+    return DateFormat.Hm().format(dateTime);
+  }
+  
+  // ファイルアイコンの取得
+  IconData _getFileIcon(String filePath) {
+    final extension = path.extension(filePath).toLowerCase();
+    
+    switch (extension) {
+      case '.pdf':
+        return Icons.picture_as_pdf;
+      case '.doc':
+      case '.docx':
+        return Icons.description;
+      case '.xls':
+      case '.xlsx':
+        return Icons.table_chart;
+      case '.csv':
+        return Icons.table_rows;
+      default:
+        return Icons.insert_drive_file;
+    }
+  }
+  
+  // ファイル名の取得
+  String _getFileName(String filePath) {
+    return path.basename(filePath);
+  }
+  
+  // ファイルを開く
+  void _openFile(String filePath) async {
+    final uri = Uri.file(filePath);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
+  
+  // URLを開く
+  void _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+}
