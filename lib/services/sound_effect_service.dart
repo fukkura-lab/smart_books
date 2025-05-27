@@ -1,7 +1,8 @@
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 /// アプリ全体で使用する効果音を管理するサービス
+/// OSデフォルトのシステムサウンドを利用するバージョン
 class SoundEffectService {
   // シングルトンパターン用のプライベートコンストラクタ
   SoundEffectService._();
@@ -10,12 +11,8 @@ class SoundEffectService {
   /// シングルトンインスタンスを取得
   factory SoundEffectService() => _instance;
 
-  /// オーディオプレイヤーのインスタンス (複数の効果音を同時再生できるよう複数のプレイヤーを用意)
-  final List<AudioPlayer> _players = [
-    AudioPlayer(),
-    AudioPlayer(),
-    AudioPlayer(),
-  ];
+  /// システムサウンド用のMethodChannel
+  static const MethodChannel _channel = MethodChannel('com.smartbooks.system_sound');
 
   /// 効果音が有効かどうか
   bool _isSoundEnabled = true;
@@ -36,48 +33,15 @@ class SoundEffectService {
     if (_isInitialized) return;
     
     try {
-      // プレーヤーの設定
-      for (final player in _players) {
-        await player.setReleaseMode(ReleaseMode.stop); // リソースを解放するモード
-        await player.setPlayerMode(PlayerMode.lowLatency); // 低遅延モード
-        // 無音ファイルの読み込みを試みるが、失敗しても続行する
-        try {
-          await player.setSourceAsset('audio/silence.mp3'); // 無音を読み込み（初期化用）
-        } catch (e) {
-          debugPrint('🔊 Warning: Could not load silence.mp3, but continuing: $e');
-        }
-      }
-      
-      // 効果音ファイルの事前読み込みを試みるが、失敗しても続行する
-      try {
-        await AudioCache.instance.loadAll([
-          'audio/click.mp3',
-          'audio/success.mp3',
-          'audio/error.mp3',
-          'audio/swipe.mp3',
-          'audio/notification.mp3',
-        ]);
-      } catch (e) {
-        debugPrint('🔊 Warning: Could not preload sound files, but continuing: $e');
-      }
-      
+      // OSのサウンド設定を確認
+      _isSoundEnabled = await _channel.invokeMethod<bool>('checkSystemSoundEnabled') ?? true;
       _isInitialized = true;
       debugPrint('🔊 SoundEffectService initialized successfully');
     } catch (e) {
       debugPrint('🔊 Failed to initialize SoundEffectService: $e');
+      // エラーの場合もデフォルトで有効に
+      _isInitialized = true;
     }
-  }
-  
-  /// 使用可能なプレイヤーを取得
-  AudioPlayer _getAvailablePlayer() {
-    // 再生中でないプレイヤーを探す
-    for (final player in _players) {
-      if (player.state != PlayerState.playing) {
-        return player;
-      }
-    }
-    // 全てのプレイヤーが使用中の場合は最初のプレイヤーを返す
-    return _players.first;
   }
   
   /// 効果音を再生
@@ -85,59 +49,51 @@ class SoundEffectService {
     if (!_isSoundEnabled || !_isInitialized) return;
     
     try {
-      final player = _getAvailablePlayer();
-      
-      // ボリュームを設定
-      await player.setVolume(effect.volume);
-      
-      // アセットから効果音を再生するが、失敗してもエラーが表示されるだけ
-      try {
-        await player.play(
-          AssetSource(effect.assetPath),
-          volume: effect.volume,
-          mode: PlayerMode.lowLatency,
+      // OSのシステムサウンドを再生
+      if (effect._systemSoundType != null) {
+        // SystemSoundType APIを使用
+        await SystemSound.play(effect._systemSoundType!);
+      } else if (effect._osSpecificId != null) {
+        // プラットフォーム固有のサウンドIDを使用
+        await _channel.invokeMethod<void>(
+          'playSystemSound', 
+          {'soundId': effect._osSpecificId}
         );
-      } catch (e) {
-        debugPrint('🔊 Error playing sound effect: $e');
       }
     } catch (e) {
-      debugPrint('🔊 Error setting up sound player: $e');
+      debugPrint('🔊 Error playing system sound: $e');
     }
   }
 
-  /// すべての効果音を停止
+  /// すべての効果音を停止 (OSのシステムサウンドは短いので実際には不要)
   Future<void> stopAllSounds() async {
-    if (!_isInitialized) return;
-    
-    for (final player in _players) {
-      await player.stop();
-    }
+    // システムサウンドは短いので特に何もしない
   }
   
   /// リソースを解放
   Future<void> dispose() async {
-    if (!_isInitialized) return;
-    
-    for (final player in _players) {
-      await player.dispose();
-    }
-    
     _isInitialized = false;
   }
   
   /// クリック効果音を再生
   Future<void> playClickSound() async {
     await playSound(SoundEffect.click);
+    // 触覚フィードバックも追加
+    HapticFeedback.selectionClick();
   }
   
   /// 成功効果音を再生
   Future<void> playSuccessSound() async {
     await playSound(SoundEffect.success);
+    // 触覚フィードバックも追加
+    HapticFeedback.lightImpact();
   }
   
   /// エラー効果音を再生
   Future<void> playErrorSound() async {
     await playSound(SoundEffect.error);
+    // 触覚フィードバックも追加
+    HapticFeedback.vibrate();
   }
   
   /// スワイプ効果音を再生
@@ -153,23 +109,25 @@ class SoundEffectService {
 
 /// 効果音の種類
 class SoundEffect {
-  final String assetPath;
-  final double volume;
+  final SystemSoundType? _systemSoundType;
+  final int? _osSpecificId; // プラットフォーム固有のサウンドID
   
-  const SoundEffect(this.assetPath, {this.volume = 1.0});
+  const SoundEffect._({SystemSoundType? systemSoundType, int? osSpecificId})
+      : _systemSoundType = systemSoundType,
+        _osSpecificId = osSpecificId;
   
   /// クリック音
-  static const SoundEffect click = SoundEffect('audio/click.mp3', volume: 0.5);
+  static const SoundEffect click = SoundEffect._(systemSoundType: SystemSoundType.click);
   
   /// 成功音
-  static const SoundEffect success = SoundEffect('audio/success.mp3', volume: 0.7);
+  static const SoundEffect success = SoundEffect._(osSpecificId: 1054); // iOS: 完了音, Android: 同等の音
   
   /// エラー音
-  static const SoundEffect error = SoundEffect('audio/error.mp3', volume: 0.6);
+  static const SoundEffect error = SoundEffect._(osSpecificId: 1073); // iOS: アラート音, Android: 同等の音
   
   /// スワイプ音
-  static const SoundEffect swipe = SoundEffect('audio/swipe.mp3', volume: 0.4);
+  static const SoundEffect swipe = SoundEffect._(osSpecificId: 1057); // iOS: スワイプ音, Android: 同等の音
   
   /// 通知音
-  static const SoundEffect notification = SoundEffect('audio/notification.mp3', volume: 0.8);
+  static const SoundEffect notification = SoundEffect._(osSpecificId: 1007); // iOS: 通知音, Android: 同等の音
 }

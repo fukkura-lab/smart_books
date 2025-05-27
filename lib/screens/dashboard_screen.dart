@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:smart_books/screens/reports/monthly_report_screen.dart';
 import 'package:smart_books/utils/keyboard_util.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -34,10 +35,10 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   // カレンダーで選択した期間
   DateTimeRange? _customDateRange;
-  
+
   // 日付選択用
   DateTime selectedDate = DateTime.now();
-  
+
   // 補助カラー
   final Color secondaryColor = const Color(0xFF1A237E); // 濃紺
   final Color accentColor = const Color(0xFFF8BBD0); // 薄ピンク
@@ -99,36 +100,22 @@ class _DashboardScreenState extends State<DashboardScreen>
     {'name': '会議費', 'amount': -7500, 'color': Colors.blueAccent},
   ];
 
-  // 月次データ生成
+  // 月次データ生成（ダミーデータ）
   List<Map<String, dynamic>> _generateMonthlyData() {
-    final random = math.Random();
-    final List<Map<String, dynamic>> data = [];
-
-    final months = [
-      '1月',
-      '2月',
-      '3月',
-      '4月',
-      '5月',
-      '6月',
-      '7月',
-      '8月',
-      '9月',
-      '10月',
-      '11月',
-      '12月'
+    final List<Map<String, dynamic>> data = [
+      {'month': '1月', 'income': 350000, 'expense': 280000, 'profit': 70000},
+      {'month': '2月', 'income': 420000, 'expense': 310000, 'profit': 110000},
+      {'month': '3月', 'income': 380000, 'expense': 295000, 'profit': 85000},
+      {'month': '4月', 'income': 450000, 'expense': 320000, 'profit': 130000},
+      {'month': '5月', 'income': 390000, 'expense': 275000, 'profit': 115000},
+      {'month': '6月', 'income': 480000, 'expense': 340000, 'profit': 140000},
+      {'month': '7月', 'income': 410000, 'expense': 285000, 'profit': 125000},
+      {'month': '8月', 'income': 360000, 'expense': 250000, 'profit': 110000},
+      {'month': '9月', 'income': 430000, 'expense': 300000, 'profit': 130000},
+      {'month': '10月', 'income': 470000, 'expense': 330000, 'profit': 140000},
+      {'month': '11月', 'income': 440000, 'expense': 315000, 'profit': 125000},
+      {'month': '12月', 'income': 520000, 'expense': 380000, 'profit': 140000},
     ];
-
-    for (int i = 0; i < months.length; i++) {
-      final income = 200000 + random.nextInt(300000);
-      final expense = 100000 + random.nextInt(150000);
-      data.add({
-        'month': months[i],
-        'income': income,
-        'expense': expense,
-        'profit': income - expense,
-      });
-    }
 
     return data;
   }
@@ -298,11 +285,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (context) => MonthlyReportScreen(
-                            month: _selectedPeriod == '今月' 
-                              ? DateTime.now() 
-                              : (_selectedPeriod == '先月'
-                                ? DateTime(DateTime.now().year, DateTime.now().month - 1, 1)
-                                : DateTime.now()),
+                            month: _selectedPeriod == '今月'
+                                ? DateTime.now()
+                                : (_selectedPeriod == '先月'
+                                    ? DateTime(DateTime.now().year,
+                                        DateTime.now().month - 1, 1)
+                                    : DateTime.now()),
                           ),
                         ),
                       );
@@ -319,8 +307,8 @@ class _DashboardScreenState extends State<DashboardScreen>
 
               const SizedBox(height: 8),
 
-              // 改善した月別収支グラフ
-              _buildEnhancedMonthlyChart(context, monthlyData),
+              // Z軸を活用した高精度な月別収支グラフ
+              _buildZAxisMonthlyChart(context, monthlyData),
 
               const SizedBox(height: 24),
 
@@ -766,7 +754,220 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  // 改善した月別グラフ
+  // fl_chartを使用した月別収支グラフ
+  Widget _buildZAxisMonthlyChart(
+      BuildContext context, List<Map<String, dynamic>> data) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // グラフの凡例
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildLegendItem('収入', Colors.green[400]!),
+                const SizedBox(width: 32),
+                _buildLegendItem('支出', Colors.red[400]!),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+
+            // fl_chartを使用したグラフ
+            SizedBox(
+              height: 240,
+              child: BarChart(
+                BarChartData(
+                  alignment: BarChartAlignment.spaceAround,
+                  maxY: _getMaxValue(data).toDouble(),
+                  minY: 0,
+                  barTouchData: BarTouchData(
+                    enabled: true,
+                    touchTooltipData: BarTouchTooltipData(
+                      tooltipBgColor: Colors.grey[800],
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                        final month = data[groupIndex]['month'] as String;
+                        final isIncome = rodIndex == 0;
+                        final value = rod.toY.toInt();
+                        final label = isIncome ? '収入' : '支出';
+                        return BarTooltipItem(
+                          '$month\n$label: ¥${NumberFormat('#,###').format(value)}',
+                          TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  titlesData: FlTitlesData(
+                    show: true,
+                    rightTitles: AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    topTitles: AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, meta) {
+                          final index = value.toInt();
+                          if (index >= 0 && index < data.length) {
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: Text(
+                                data[index]['month'] as String,
+                                style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                  color: Colors.grey[800],  // 濃いめの黒に統一
+                              ),
+                              ),
+                            );
+                          }
+                          return const Text('');
+                        },
+                        reservedSize: 32,
+                      ),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 50,
+                        getTitlesWidget: (value, meta) {
+                          if (value == 0) {
+                            return Text(
+                              '0',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey[800],  // 濃いめの黒に統一
+                              ),
+                            );
+                          }
+                          
+                          final intValue = value.toInt();
+                          if (intValue >= 10000) {
+                            return Text(
+                              '${(intValue / 10000).toStringAsFixed(0)}万',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey[800],  // 濃いめの黒に統一
+                              ),
+                            );
+                          } else if (intValue >= 1000) {
+                            return Text(
+                              '${(intValue / 1000).toStringAsFixed(0)}K',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey[800],  // 濃いめの黒に統一
+                              ),
+                            );
+                          }
+                          return Text(
+                            intValue.toString(),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Colors.grey[800],  // 濃いめの黒に統一
+                            ),
+                          );
+                        },
+                        interval: _getMaxValue(data) / 4,
+                      ),
+                    ),
+                  ),
+                  borderData: FlBorderData(
+                    show: true,
+                    border: Border(
+                      bottom: BorderSide(
+                        color: Colors.grey[300]!,
+                        width: 1,
+                      ),
+                      left: BorderSide(
+                        color: Colors.grey[300]!,
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  barGroups: _buildBarGroups(data),
+                  gridData: FlGridData(
+                    show: true,
+                    horizontalInterval: _getMaxValue(data) / 4,
+                    getDrawingHorizontalLine: (value) {
+                      return FlLine(
+                        color: value == 0 
+                            ? Colors.black.withOpacity(0.6) 
+                            : Colors.grey[200]!,
+                        strokeWidth: value == 0 ? 2 : 1,
+                      );
+                    },
+                    drawVerticalLine: false,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // データの最大値を取得
+  int _getMaxValue(List<Map<String, dynamic>> data) {
+    int maxValue = 100000;
+    for (var item in data) {
+      final income = (item['income'] as int? ?? 0);
+      final expense = (item['expense'] as int? ?? 0);
+      maxValue = math.max(maxValue, math.max(income, expense));
+    }
+    return maxValue;
+  }
+
+  // fl_chart用のバーグループを作成
+  List<BarChartGroupData> _buildBarGroups(List<Map<String, dynamic>> data) {
+    return data.asMap().entries.map((entry) {
+      final index = entry.key;
+      final item = entry.value;
+      
+      final income = (item['income'] as int? ?? 0).toDouble();
+      final expense = (item['expense'] as int? ?? 0).toDouble();
+      
+      return BarChartGroupData(
+        x: index,
+        barRods: [
+          // 収入バー
+          BarChartRodData(
+            toY: income,
+            color: Colors.green[400]!,
+            width: 8,  // 12から8に変更してスマートに
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(3),  // 角丸も少し調整
+            ),
+          ),
+          // 支出バー
+          BarChartRodData(
+            toY: expense,
+            color: Colors.red[400]!,
+            width: 8,  // 12から8に変更してスマートに
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(3),  // 角丸も少し調整
+            ),
+          ),
+        ],
+        barsSpace: 3,  // バー間のスペースも少し調整
+      );
+    }).toList();
+  }
+
+  // 改善した月別グラフ（バックアップ用）
   Widget _buildEnhancedMonthlyChart(
       BuildContext context, List<Map<String, dynamic>> data) {
     return Card(
@@ -819,122 +1020,199 @@ class _DashboardScreenState extends State<DashboardScreen>
                     maxValue
                   ];
 
+                  // グラフの実際の描画高さ
+                  final chartHeight = maxHeight * 0.8; // 80%をグラフに使用
+
+                  // 月ラベルとX軸のための空間
+                  final bottomPadding = maxHeight * 0.2; // 20%を下部のラベルに使用
+
                   return Stack(
                     children: [
                       // Y軸の目盛りと線
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: markers
-                            .map((value) {
-                              return Row(
-                                children: [
-                                  SizedBox(
-                                    width: 40,
-                                    child: Text(
-                                      value >= 10000
-                                          ? '${(value / 10000).toStringAsFixed(0)}万'
-                                          : value.toString(),
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.grey[600],
+                      Container(
+                        height: chartHeight,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: markers
+                              .map((value) {
+                                // 大きい数値の表示フォーマットを改善
+                                String valueText;
+                                if (value >= 1000000) {
+                                  valueText =
+                                      '${(value / 1000000).toStringAsFixed(1)}億';
+                                } else if (value >= 10000) {
+                                  valueText =
+                                      '${(value / 10000).toStringAsFixed(0)}万';
+                                } else {
+                                  valueText = value.toString();
+                                }
+
+                                return Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 40,
+                                      child: Text(
+                                        valueText,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey[800],  // 濃いめの黒に統一
+                                          fontWeight: value == 0
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                        ),
+                                        textAlign: TextAlign.right,
                                       ),
-                                      textAlign: TextAlign.right,
                                     ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Container(
-                                      height: 1,
-                                      color: Colors.grey[200],
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Container(
+                                        height: value == 0 ? 2 : 1, // 0の線を太く
+                                        color: value == 0
+                                            ? Colors.black
+                                                .withOpacity(0.5) // 0の線の色をより濃く
+                                            : Colors.grey[200],
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              );
-                            })
-                            .toList()
-                            .reversed
-                            .toList(),
+                                  ],
+                                );
+                              })
+                              .toList()
+                              .reversed
+                              .toList(),
+                        ),
+                      ),
+
+                      // 0のラインの強調表示
+                      Positioned(
+                        left: 50,
+                        bottom: bottomPadding,
+                        right: 0,
+                        child: Container(
+                          height: 1.5,
+                          color: Colors.black.withOpacity(0.6),
+                        ),
                       ),
 
                       // バーチャート
-                      Padding(
-                        padding: const EdgeInsets.only(left: 50),
+                      Positioned(
+                        left: 50,
+                        bottom: bottomPadding,
+                        right: 0,
+                        height: chartHeight,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: data.map((item) {
-                            // 列幅を計算
-                            final barWidth = (width - 60) / (data.length * 4);
 
-                            // 各値の高さを計算
+
+                            // 各値の高さを計算 - 小さな値をより見やすくする調整
+                            double getAdjustedHeight(int value) {
+                              if (value <= 0) return 0;
+
+                              // 大きい値と小さい値の差が大きい場合は少し調整
+                              final ratio = value / maxValue.toDouble();
+
+                              // 小さい値を少し大きく表示
+                              if (ratio < 0.05) {
+                                return math.max(chartHeight * 0.05,
+                                    chartHeight * ratio); // 最低5%の高さを確保
+                              }
+
+                              return chartHeight * ratio;
+                            }
+                            
+                            // 列幅を計算 - よりスマートに調整
+                            final barWidth = (width - 60) / (data.length * 5);  // 4から5に変更してより細く
+
                             final incomeHeight =
-                                ((item['income'] as int) / maxValue) *
-                                    maxHeight *
-                                    0.85;
+                                getAdjustedHeight(item['income'] as int);
                             final expenseHeight =
-                                ((item['expense'] as int) / maxValue) *
-                                    maxHeight *
-                                    0.85;
-                            final profitHeight =
-                                ((item['profit'] as int).abs() / maxValue) *
-                                    maxHeight *
-                                    0.85;
+                                getAdjustedHeight(item['expense'] as int);
+                            final profitHeight = getAdjustedHeight(
+                                (item['profit'] as int).abs());
                             final profitColor = (item['profit'] as int) >= 0
                                 ? Colors.blue[400]!
                                 : Colors.orange;
 
                             return Column(
                               mainAxisAlignment: MainAxisAlignment.end,
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 // バーグループ
-                                SizedBox(
-                                  height: maxHeight - 22, // 底部のラベル用のスペースを確保
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          // 収入バー
-                                          _buildBarWithLabel(
-                                            barWidth,
-                                            incomeHeight,
-                                            Colors.green[400]!,
-                                            '¥${NumberFormat('#,###').format(item['income'])}',
-                                          ),
-                                          const SizedBox(width: 1),
-                                          // 支出バー
-                                          _buildBarWithLabel(
-                                            barWidth,
-                                            expenseHeight,
-                                            Colors.red[400]!,
-                                            '¥${NumberFormat('#,###').format(item['expense'])}',
-                                          ),
-                                          const SizedBox(width: 1),
-                                          // 利益バー
-                                          _buildBarWithLabel(
-                                            barWidth,
-                                            profitHeight,
-                                            profitColor,
-                                            '¥${NumberFormat('#,###').format(item['profit'].abs())}',
-                                            isProfit: item['profit'] >= 0,
-                                          ),
-                                        ],
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    // 収入バー
+                                    Container(
+                                      width: barWidth,
+                                      height: incomeHeight > 0
+                                          ? math.max(incomeHeight, 5)
+                                          : 0, // 最小高さを増やす
+                                      decoration: BoxDecoration(
+                                        color: Colors.green[400],
+                                        borderRadius:
+                                            const BorderRadius.vertical(
+                                          top: Radius.circular(2),  // 角丸を小さくしてシャープに
+                                        ),
                                       ),
-                                    ],
-                                  ),
-                                ),
-
-                                // 月表示ラベル
-                                const SizedBox(height: 4),
-                                Text(
-                                  item['month'] as String,
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                    ),
+                                    const SizedBox(width: 2),  // バー間のスペースを少し広げる
+                                    // 支出バー
+                                    Container(
+                                      width: barWidth,
+                                      height: expenseHeight > 0
+                                          ? math.max(expenseHeight, 5)
+                                          : 0, // 最小高さを増やす
+                                      decoration: BoxDecoration(
+                                        color: Colors.red[400],
+                                        borderRadius:
+                                            const BorderRadius.vertical(
+                                          top: Radius.circular(2),  // 角丸を小さくしてシャープに
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 2),  // バー間のスペースを少し広げる
+                                    // 利益バー
+                                    Container(
+                                      width: barWidth,
+                                      height: profitHeight > 0
+                                          ? math.max(profitHeight, 5)
+                                          : 0, // 最小高さを増やす
+                                      decoration: BoxDecoration(
+                                        color: profitColor,
+                                        borderRadius:
+                                            const BorderRadius.vertical(
+                                          top: Radius.circular(2),  // 角丸を小さくしてシャープに
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
+                            );
+                          }).toList(),
+                        ),
+                      ),
+
+                      // 月ラベル
+                      Positioned(
+                        left: 50,
+                        bottom: 0,
+                        right: 0,
+                        height: bottomPadding - 4, // 下部に少し余白を確保
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: data.map((item) {
+                            return Text(
+                              item['month'] as String,
+                              style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                                color: Colors.grey[800],  // 濃いめの黒に統一
+                            ),
                             );
                           }).toList(),
                         ),
@@ -947,26 +1225,6 @@ class _DashboardScreenState extends State<DashboardScreen>
           ],
         ),
       ),
-    );
-  }
-
-  // バーチャートの列を作成（ホバー時に値を表示）
-  Widget _buildBarWithLabel(
-      double width, double height, Color color, String label,
-      {bool isProfit = true}) {
-    return Stack(
-      alignment: Alignment.bottomCenter,
-      children: [
-        Container(
-          width: width,
-          height: height,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(4),
-          ),
-        ),
-        // バーの上に小さなラベル表示は省略（スペースの関係で）
-      ],
     );
   }
 
@@ -1299,19 +1557,21 @@ class _DashboardScreenState extends State<DashboardScreen>
   void _showAddTransactionDialog() {
     // ダイアログ表示前にフォーカスを外す
     KeyboardUtil.hideKeyboard(context);
-    
+
     // 状態変数
     bool isIncome = true; // 初期値を収入にする
     String? selectedCategory;
     final primaryColor = Theme.of(context).primaryColor;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     // ダークモードの場合の背景色とテキスト色
     final bgColor = isDarkMode ? Colors.grey.shade800 : Colors.white;
     final textColor = isDarkMode ? Colors.white : Colors.grey.shade800;
-    final fieldBgColor = isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50;
-    final fieldBorderColor = isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300;
-    
+    final fieldBgColor =
+        isDarkMode ? Colors.grey.shade700 : Colors.grey.shade50;
+    final fieldBorderColor =
+        isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300;
+
     // 収入用カテゴリー
     final incomeCategories = [
       '売上',
@@ -1321,7 +1581,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       '賞与',
       'その他収入',
     ];
-    
+
     // 支出用カテゴリー
     final expenseCategories = [
       '交通費',
@@ -1336,7 +1596,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       '人件費',
       'その他経費',
     ];
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1357,7 +1617,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                 ),
                 decoration: BoxDecoration(
                   color: bgColor,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(20)),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1382,18 +1643,23 @@ class _DashboardScreenState extends State<DashboardScreen>
                         ),
                         const Spacer(),
                         IconButton(
-                          icon: Icon(Icons.close, color: isDarkMode ? Colors.grey.shade300 : Colors.grey.shade600),
+                          icon: Icon(Icons.close,
+                              color: isDarkMode
+                                  ? Colors.grey.shade300
+                                  : Colors.grey.shade600),
                           onPressed: () => Navigator.pop(context),
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     // タブ選択（収入/支出）
                     Container(
                       decoration: BoxDecoration(
-                        color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade100,
+                        color: isDarkMode
+                            ? Colors.grey.shade700
+                            : Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(30),
                         boxShadow: [
                           BoxShadow(
@@ -1418,14 +1684,21 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 HapticFeedback.lightImpact();
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: isIncome ? primaryColor : Colors.transparent,
-                                foregroundColor: isIncome ? Colors.white : (isDarkMode ? Colors.white70 : Colors.grey.shade700),
+                                backgroundColor: isIncome
+                                    ? primaryColor
+                                    : Colors.transparent,
+                                foregroundColor: isIncome
+                                    ? Colors.white
+                                    : (isDarkMode
+                                        ? Colors.white70
+                                        : Colors.grey.shade700),
                                 elevation: isIncome ? 0 : 0,
                                 shadowColor: Colors.transparent,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(30),
                                 ),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
                               ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -1433,7 +1706,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   Icon(
                                     Icons.arrow_circle_up,
                                     size: 16,
-                                    color: isIncome ? Colors.white : (isDarkMode ? Colors.white70 : Colors.grey.shade700),
+                                    color: isIncome
+                                        ? Colors.white
+                                        : (isDarkMode
+                                            ? Colors.white70
+                                            : Colors.grey.shade700),
                                   ),
                                   const SizedBox(width: 6),
                                   const Text('収入'),
@@ -1441,7 +1718,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                               ),
                             ),
                           ),
-                          
+
                           // 支出ボタン
                           Expanded(
                             child: ElevatedButton(
@@ -1454,14 +1731,21 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 HapticFeedback.lightImpact();
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: !isIncome ? accentColor : Colors.transparent,
-                                foregroundColor: !isIncome ? Colors.white : (isDarkMode ? Colors.white70 : Colors.grey.shade700),
+                                backgroundColor: !isIncome
+                                    ? accentColor
+                                    : Colors.transparent,
+                                foregroundColor: !isIncome
+                                    ? Colors.white
+                                    : (isDarkMode
+                                        ? Colors.white70
+                                        : Colors.grey.shade700),
                                 elevation: !isIncome ? 0 : 0,
                                 shadowColor: Colors.transparent,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(30),
                                 ),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
                               ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -1469,7 +1753,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   Icon(
                                     Icons.arrow_circle_down,
                                     size: 16,
-                                    color: !isIncome ? Colors.white : (isDarkMode ? Colors.white70 : Colors.grey.shade700),
+                                    color: !isIncome
+                                        ? Colors.white
+                                        : (isDarkMode
+                                            ? Colors.white70
+                                            : Colors.grey.shade700),
                                   ),
                                   const SizedBox(width: 6),
                                   const Text('支出'),
@@ -1480,16 +1768,17 @@ class _DashboardScreenState extends State<DashboardScreen>
                         ],
                       ),
                     ),
-                    
+
                     const SizedBox(height: 20),
-                    
+
                     // フォーム内容
                     TextField(
                       style: TextStyle(color: textColor),
                       decoration: InputDecoration(
                         labelText: '取引名',
                         labelStyle: TextStyle(color: primaryColor),
-                        prefixIcon: Icon(Icons.description, color: primaryColor),
+                        prefixIcon:
+                            Icon(Icons.description, color: primaryColor),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: BorderSide(color: primaryColor),
@@ -1504,20 +1793,23 @@ class _DashboardScreenState extends State<DashboardScreen>
                         ),
                         filled: true,
                         fillColor: fieldBgColor,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                            vertical: 16, horizontal: 16),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     TextField(
                       style: TextStyle(color: textColor),
                       decoration: InputDecoration(
                         labelText: '金額',
                         labelStyle: TextStyle(color: primaryColor),
-                        prefixIcon: Icon(Icons.attach_money, color: primaryColor),
+                        prefixIcon:
+                            Icon(Icons.attach_money, color: primaryColor),
                         prefixText: '¥',
-                        prefixStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
+                        prefixStyle: TextStyle(
+                            color: primaryColor, fontWeight: FontWeight.bold),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: BorderSide(color: primaryColor),
@@ -1532,13 +1824,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                         ),
                         filled: true,
                         fillColor: fieldBgColor,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                            vertical: 16, horizontal: 16),
                       ),
                       keyboardType: TextInputType.number,
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     // カテゴリー選択（収入/支出で内容が変わる）
                     Theme(
                       data: Theme.of(context).copyWith(
@@ -1558,7 +1851,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: primaryColor, width: 2),
+                            borderSide:
+                                BorderSide(color: primaryColor, width: 2),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
@@ -1566,9 +1860,11 @@ class _DashboardScreenState extends State<DashboardScreen>
                           ),
                           filled: true,
                           fillColor: fieldBgColor,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                          contentPadding: const EdgeInsets.symmetric(
+                              vertical: 16, horizontal: 16),
                         ),
-                        items: (isIncome ? incomeCategories : expenseCategories).map((category) {
+                        items: (isIncome ? incomeCategories : expenseCategories)
+                            .map((category) {
                           return DropdownMenuItem<String>(
                             value: category,
                             child: Text(category),
@@ -1579,13 +1875,18 @@ class _DashboardScreenState extends State<DashboardScreen>
                             selectedCategory = value;
                           });
                         },
-                        icon: Icon(Icons.arrow_drop_down, color: secondaryColor),
-                        hint: Text('カテゴリを選択', style: TextStyle(color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade400)),
+                        icon:
+                            Icon(Icons.arrow_drop_down, color: secondaryColor),
+                        hint: Text('カテゴリを選択',
+                            style: TextStyle(
+                                color: isDarkMode
+                                    ? Colors.grey.shade400
+                                    : Colors.grey.shade400)),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     // 日付選択（タップでカレンダー表示）
                     InkWell(
                       onTap: () async {
@@ -1594,7 +1895,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                           context: context,
                           initialDate: selectedDate,
                           firstDate: DateTime(2000),
-                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                          lastDate:
+                              DateTime.now().add(const Duration(days: 365)),
                           builder: (BuildContext context, Widget? child) {
                             return Theme(
                               data: isDarkMode
@@ -1605,7 +1907,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                                         surface: Colors.grey.shade800,
                                         onSurface: Colors.white,
                                       ),
-                                      dialogBackgroundColor: Colors.grey.shade800,
+                                      dialogBackgroundColor:
+                                          Colors.grey.shade800,
                                     )
                                   : ThemeData.light().copyWith(
                                       primaryColor: secondaryColor,
@@ -1621,7 +1924,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                             );
                           },
                         );
-                        
+
                         if (pickedDate != null) {
                           setState(() {
                             selectedDate = pickedDate;
@@ -1634,7 +1937,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                         decoration: InputDecoration(
                           labelText: '日付',
                           labelStyle: TextStyle(color: secondaryColor),
-                          prefixIcon: Icon(Icons.calendar_today, color: secondaryColor),
+                          prefixIcon:
+                              Icon(Icons.calendar_today, color: secondaryColor),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
                             borderSide: BorderSide(color: secondaryColor),
@@ -1645,18 +1949,22 @@ class _DashboardScreenState extends State<DashboardScreen>
                           ),
                           filled: true,
                           fillColor: fieldBgColor,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-                          suffixIcon: Icon(Icons.arrow_drop_down, color: secondaryColor),
+                          contentPadding: const EdgeInsets.symmetric(
+                              vertical: 16, horizontal: 16),
+                          suffixIcon: Icon(Icons.arrow_drop_down,
+                              color: secondaryColor),
                         ),
                         child: Text(
                           formatDate(selectedDate),
-                          style: TextStyle(color: isDarkMode ? Colors.white : secondaryColor),
+                          style: TextStyle(
+                              color:
+                                  isDarkMode ? Colors.white : secondaryColor),
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // 送信ボタン
                     SizedBox(
                       width: double.infinity,
@@ -1665,20 +1973,23 @@ class _DashboardScreenState extends State<DashboardScreen>
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text(isIncome ? '収入を登録しました' : '支出を登録しました'),
-                              backgroundColor: isIncome ? Colors.green : accentColor,
+                              content:
+                                  Text(isIncome ? '収入を登録しました' : '支出を登録しました'),
+                              backgroundColor:
+                                  isIncome ? Colors.green : accentColor,
                             ),
                           );
                           // 触覚フィードバック
                           HapticFeedback.mediumImpact();
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isIncome ? secondaryColor : accentColor,
+                          backgroundColor:
+                              isIncome ? secondaryColor : accentColor,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           elevation: 3,
-                          shadowColor: isIncome 
-                              ? secondaryColor.withOpacity(0.5) 
+                          shadowColor: isIncome
+                              ? secondaryColor.withOpacity(0.5)
                               : accentColor.withOpacity(0.5),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -1688,7 +1999,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              isIncome ? Icons.arrow_circle_up : Icons.arrow_circle_down,
+                              isIncome
+                                  ? Icons.arrow_circle_up
+                                  : Icons.arrow_circle_down,
                               size: 20,
                             ),
                             const SizedBox(width: 8),
@@ -1703,7 +2016,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 20),
                   ],
                 ),
